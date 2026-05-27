@@ -303,10 +303,9 @@ async function exportSelected() {
     }
 
     // Rate limit delay between channels (skip after last)
-    // 5 s gives plenty of headroom against Slack's Tier 3 limits
     if (i < selected.length - 1) {
       updateProgress(i + 1, selected.length, 'Waiting (rate limit)...');
-      await sleep(5000);
+      await sleep(2500);
     }
   }
 

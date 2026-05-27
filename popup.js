@@ -27,6 +27,9 @@ const settingsBtn = document.getElementById('settingsBtn');
 const quickAddBtn = document.getElementById('quickAddBtn');
 const quickAddSection = document.getElementById('quickAddSection');
 const openOptionsLink = document.getElementById('openOptionsLink');
+const dateFromInput = document.getElementById('dateFrom');
+const dateToInput = document.getElementById('dateTo');
+const dateRangeSection = document.getElementById('dateRangeSection');
 
 // ── Initialisation ─────────────────────────────────────────────────
 
@@ -58,6 +61,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Load combined export preference
     combinedExportCb.checked = config.combinedExport || false;
+
+    // Default date range: From = 7 days ago, To = today
+    const today = new Date();
+    const weekAgo = new Date(today);
+    weekAgo.setDate(today.getDate() - 7);
+    dateFromInput.value = weekAgo.toISOString().slice(0, 10);
+    dateToInput.value = today.toISOString().slice(0, 10);
 
     renderChannels();
     updateExportButton();
@@ -243,11 +253,20 @@ async function exportSelected() {
     setChannelStatus(channel.channelId, 'active');
 
     try {
+      // Resolve date range: explicit picker values take priority over last-exported
+      const fromDate = dateFromInput.value
+        ? new Date(dateFromInput.value + 'T00:00:00').getTime()
+        : (lastExportTimestamps[channel.channelId] || null);
+      const toDate = dateToInput.value
+        ? new Date(dateToInput.value + 'T23:59:59').getTime()
+        : null;
+
       const response = await chrome.tabs.sendMessage(activeTab.id, {
         action: 'BATCH_EXPORT_CHANNEL',
         channelId: channel.channelId,
         channelName: channel.name,
-        oldestTimestamp: lastExportTimestamps[channel.channelId] || null
+        oldestTimestamp: fromDate,
+        newestTimestamp: toDate
       });
 
       if (response && response.success) {
@@ -284,9 +303,10 @@ async function exportSelected() {
     }
 
     // Rate limit delay between channels (skip after last)
+    // 5 s gives plenty of headroom against Slack's Tier 3 limits
     if (i < selected.length - 1) {
       updateProgress(i + 1, selected.length, 'Waiting (rate limit)...');
-      await sleep(2500);
+      await sleep(5000);
     }
   }
 
